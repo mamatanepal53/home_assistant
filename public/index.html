@@ -2,112 +2,49 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Weather Station Dashboard</title>
-
-  <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
-
+  <title>Weather Dashboard</title>
   <style>
     body {
-      font-family: 'Roboto', sans-serif;
-      margin: 0;
-      padding: 20px;
-      background: linear-gradient(135deg, #e3f2fd, #f1f8e9);
-      color: #333;
+      font-family: monospace;
+      margin: 20px;
+      background: #fff;
+      color: #000;
     }
-
     h1 {
       margin-bottom: 10px;
-      font-size: 2rem;
-      color: #2c3e50;
     }
-
-    p {
-      margin-top: 0;
-      color: #555;
+    .section {
+      margin-bottom: 20px;
     }
-
-    .card {
-      background: #fff;
-      border-radius: 10px;
-      padding: 20px;
-      margin-bottom: 25px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      transition: transform 0.2s ease;
+    .reading {
+      margin: 5px 0;
     }
-
-    .card:hover {
-      transform: translateY(-3px);
+    .divider {
+      border-top: 1px solid #000;
+      margin: 15px 0;
     }
-
-    .label {
-      font-weight: bold;
-      color: #2c3e50;
-    }
-
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      background: #fff;
-      border-radius: 10px;
-      overflow: hidden;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-
-    th, td {
-      padding: 12px;
-      text-align: center;
-      border-bottom: 1px solid #eee;
-    }
-
-    th {
-      background: #f9f9f9;
-      font-weight: bold;
-      color: #2c3e50;
-    }
-
-    tr:hover {
-      background-color: #f1f8e9;
-    }
-
-    #status {
-      font-weight: bold;
-      color: #388e3c; /* default green */
-    }
-
-    /* Status colors */
-    .connecting { color: #f57c00; }
-    .connected { color: #388e3c; }
-    .error { color: #d32f2f; }
   </style>
 </head>
 <body>
-  <h1>Weather Station Dashboard</h1>
-  <p>Live temperature and humidity readings</p>
+  <h1>Weather Dashboard</h1>
 
-  <div class="card">
-    <h2>Current Reading</h2>
-    <p><span class="label">Temperature:</span> <span id="temp">--</span> °C</p>
-    <p><span class="label">Humidity:</span> <span id="hum">--</span> %</p>
-    <p><span class="label">Time:</span> <span id="time">--</span></p>
-    <p><span class="label">WebSocket Status:</span> <span id="status" class="connecting">Connecting...</span></p>
+  <div class="section">
+    <h2>Current</h2>
+    <div class="reading">Temperature: <span id="temp">--</span> °C</div>
+    <div class="reading">Humidity: <span id="hum">--</span> %</div>
+    <div class="reading">Time: <span id="time">--</span></div>
+    <div class="reading">Status: <span id="status">Connecting...</span></div>
   </div>
 
-  <div class="card">
+  <div class="divider"></div>
+
+  <div class="section">
     <h2>Recent Readings</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Temperature (°C)</th>
-          <th>Humidity (%)</th>
-          <th>Time</th>
-        </tr>
-      </thead>
-      <tbody id="history-body">
-        <!-- Filled by JS -->
-      </tbody>
-    </table>
+    <div id="history-body">
+      <!-- Example format:
+      <div class="reading">#1 | 22°C | 45% | 09:40</div>
+      -->
+    </div>
   </div>
 
   <script src="script.js"></script>

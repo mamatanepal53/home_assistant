@@ -1,47 +1,24 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
   <meta charset="UTF-8" />
   <title>Weather Dashboard</title>
   <style>
-    body {
-      font-family: monospace;
-      margin: 20px;
-      background: #fff;
-      color: #000;
-    }
-    h1 {
-      margin-bottom: 10px;
-    }
-    .line {
-      margin: 4px 0;
-    }
-    .divider {
-      margin: 12px 0;
-      border-top: 1px solid #000;
-    }
+    body { font-family: monospace; padding: 20px; }
+    .line { margin: 5px 0; }
   </style>
 </head>
 <body>
   <h1>Weather Dashboard</h1>
 
-  <div>
-    <div class="line">Temperature: <span id="temp">--</span> °C</div>
-    <div class="line">Humidity: <span id="hum">--</span> %</div>
-    <div class="line">Time: <span id="time">--</span></div>
-    <!-- Status line removed -->
-  </div>
+  <div class="line">Temperature: <span id="temp">--</span> °C</div>
+  <div class="line">Humidity: <span id="hum">--</span> %</div>
+  <div class="line">Time: <span id="time">--</span></div>
 
-  <div class="divider"></div>
-
-  <h2>Recent Readings</h2>
-  <div id="history-body">
-    <!-- Example format:
-    <div class="line">#1 | 22°C | 45% | 09:40</div>
-    -->
-  </div>
+  <h2>History</h2>
+  <div id="history"></div>
 
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-<script src="script.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>

@@ -1,76 +1,27 @@
-// Use same origin as the site
-const API_BASE = window.location.origin;
+const API = window.location.origin;
 
-const tempEl = document.getElementById('temp');
-const humEl = document.getElementById('hum');
-const timeEl = document.getElementById('time');
-const statusEl = document.getElementById('status');
-const historyBody = document.getElementById('history-body');
+const tempEl = document.getElementById("temp");
+const humEl = document.getElementById("hum");
+const timeEl = document.getElementById("time");
+const historyEl = document.getElementById("history");
 
-function renderCurrent(reading) {
+function render(reading) {
   tempEl.textContent = reading.temperature.toFixed(1);
   humEl.textContent = reading.humidity.toFixed(1);
-  timeEl.textContent = new Date(reading.created_at).toLocaleString();
+  timeEl.textContent = new Date(reading.timestamp).toLocaleString();
+
+  const div = document.createElement("div");
+  div.className = "line";
+  div.textContent =
+    `${reading.temperature.toFixed(1)}°C | ${reading.humidity.toFixed(1)}% | ${new Date(reading.timestamp).toLocaleTimeString()}`;
+  historyEl.prepend(div);
 }
 
-function addHistoryRow(reading, prepend = true) {
-  const tr = document.createElement('tr');
-  tr.innerHTML = `
-    <td>${reading.id}</td>
-    <td>${reading.temperature.toFixed(1)}</td>
-    <td>${reading.humidity.toFixed(1)}</td>
-    <td>${new Date(reading.created_at).toLocaleString()}</td>
-  `;
-  if (prepend && historyBody.firstChild) {
-    historyBody.insertBefore(tr, historyBody.firstChild);
-  } else {
-    historyBody.appendChild(tr);
-  }
-}
+// Load latest on page load
+fetch(`${API}/latest`)
+  .then(r => r.json())
+  .then(data => { if (data) render(data); });
 
-// Load history on page load
-fetch(`${API_BASE}/api/readings?limit=20`)
-  .then(res => res.json())
-  .then(data => {
-    data.reverse().forEach(r => addHistoryRow(r, false)); // oldest first
-    if (data.length > 0) renderCurrent(data[data.length - 1]);
-  })
-  .catch(err => console.error('Failed to load history:', err));
-
-// WebSocket for live updates
-let ws;
-function connectWS() {
-  statusEl.textContent = 'Connecting...';
-
-  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = wsProtocol + '//' + window.location.host;
-
-  ws = new WebSocket(wsUrl);
-
-  ws.onopen = () => {
-    statusEl.textContent = 'Connected ✔';
-    statusEl.style.color = 'green';
-  };
-
-  ws.onmessage = evt => {
-    const msg = JSON.parse(evt.data);
-    if (msg.type === 'latest-reading' || msg.type === 'new-reading') {
-      renderCurrent(msg.data);
-      if (msg.type === 'new-reading') {
-        addHistoryRow(msg.data, true);
-      }
-    }
-  };
-
-  ws.onclose = () => {
-    statusEl.textContent = 'Disconnected – retrying...';
-    statusEl.style.color = 'red';
-    setTimeout(connectWS, 3000);
-  };
-
-  ws.onerror = () => {
-    ws.close();
-  };
-}
-
-connectWS();
+// Live updates
+const socket = io(API);
+socket.on("newReading", data => render(data));

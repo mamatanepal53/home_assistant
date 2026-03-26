@@ -1,165 +1,67 @@
-const express = require('express');
-const path = require('path');
-const http = require('http');
-const WebSocket = require('ws');
-const sqlite3 = require('sqlite3').verbose();
-const axios = require('axios');
-const cors = require('cors');
-
-// Discord webhook from Render environment variables
-// Set this in Render dashboard: DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/..."
-const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL || '';
+const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
+const { Pool } = require("pg");
+const path = require("path");
+const cors = require("cors");
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, { cors: { origin: "*" } });
+
 app.use(express.json());
 app.use(cors());
 
-// Serve static files (frontend) from /public
-app.use(express.static(path.join(__dirname, 'public')));
+// Serve frontend
+app.use(express.static(path.join(__dirname, "public")));
 
-// --- SQLite setup ---
-const db = new sqlite3.Database('weather.db');
-
-db.serialize(() => {
-  db.run(`
-    CREATE TABLE IF NOT EXISTS readings (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      temperature REAL NOT NULL,
-      humidity REAL NOT NULL,
-      created_at TEXT NOT NULL
-    )
-  `);
+// PostgreSQL
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
 });
 
-// --- HTTP server + WebSocket server ---
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+// Create table
+pool.query(`
+  CREATE TABLE IF NOT EXISTS readings (
+    id SERIAL PRIMARY KEY,
+    temperature REAL,
+    humidity REAL,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )
+`);
 
-// Helper to broadcast JSON to all WebSocket clients
-function broadcastJSON(obj) {
-  const msg = JSON.stringify(obj);
-  wss.clients.forEach(client => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(msg);
-    }
-  });
-}
+// WebSocket
+io.on("connection", () => {
+  console.log("Dashboard connected");
+});
 
-// Discord notification
-// Version A: ONLY send messages when temperature > 30°C
-async function sendDiscordNotification(temp, hum) {
-  if (!DISCORD_WEBHOOK_URL) return;
-
-  // Only send alert if temp is above threshold
-  const threshold = 30;
-  if (temp <= threshold) {
-    return; // no message for normal temps
-  }
-
-  const content =
-    `🔥 **HIGH TEMPERATURE ALERT!**\n` +
-    `Current reading: 🌡️ **${temp.toFixed(1)}°C**, 💧 **${hum.toFixed(1)}%**`;
-
-  try {
-    await axios.post(DISCORD_WEBHOOK_URL, { content });
-  } catch (err) {
-    console.error('Error sending Discord webhook:', err.message);
-  }
-}
-
-// --- API routes ---
-
-// Wokwi POSTs here
-app.post('/api/readings', (req, res) => {
+// ESP32 sends data here
+app.post("/data", async (req, res) => {
   const { temperature, humidity } = req.body;
 
-  if (typeof temperature !== 'number' || typeof humidity !== 'number') {
-    return res.status(400).json({ error: 'temperature and humidity must be numbers' });
-  }
-
-  const createdAt = new Date().toISOString();
-
-  db.run(
-    'INSERT INTO readings (temperature, humidity, created_at) VALUES (?, ?, ?)',
-    [temperature, humidity, createdAt],
-    function (err) {
-      if (err) {
-        console.error('DB insert error:', err);
-        return res.status(500).json({ error: 'DB error' });
-      }
-
-      const reading = {
-        id: this.lastID,
-        temperature,
-        humidity,
-        created_at: createdAt
-      };
-
-      // WebSocket clients (frontend live update)
-      broadcastJSON({ type: 'new-reading', data: reading });
-      // Discord alert (only if temp > 30°C)
-      sendDiscordNotification(temperature, humidity);
-
-      res.status(201).json(reading);
-    }
-  );
-});
-
-// Get recent readings
-app.get('/api/readings', (req, res) => {
-  const limit = Number(req.query.limit) || 50;
-
-  db.all(
-    'SELECT * FROM readings ORDER BY created_at DESC LIMIT ?',
-    [limit],
-    (err, rows) => {
-      if (err) {
-        console.error('DB select error:', err);
-        return res.status(500).json({ error: 'DB error' });
-      }
-      res.json(rows);
-    }
-  );
-});
-
-// Get latest reading
-app.get('/api/readings/latest', (req, res) => {
-  db.get(
-    'SELECT * FROM readings ORDER BY created_at DESC LIMIT 1',
-    [],
-    (err, row) => {
-      if (err) {
-        console.error('DB latest error:', err);
-        return res.status(500).json({ error: 'DB error' });
-      }
-      if (!row) return res.status(404).json({ error: 'No data yet' });
-      res.json(row);
-    }
-  );
-});
-
-// WebSocket connections
-wss.on('connection', ws => {
-  console.log('WebSocket client connected');
-
-  // Send latest reading immediately (if exists)
-  db.get(
-    'SELECT * FROM readings ORDER BY created_at DESC LIMIT 1',
-    [],
-    (err, row) => {
-      if (!err && row) {
-        ws.send(JSON.stringify({ type: 'latest-reading', data: row }));
-      }
-    }
+  await pool.query(
+    "INSERT INTO readings (temperature, humidity) VALUES ($1, $2)",
+    [temperature, humidity]
   );
 
-  ws.on('close', () => {
-    console.log('WebSocket client disconnected');
-  });
+  io.emit("newReading", { temperature, humidity, timestamp: new Date() });
+
+  res.json({ status: "ok" });
 });
 
-// Use Render's PORT or 3000 locally
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+// Dashboard fetches latest
+app.get("/latest", async (req, res) => {
+  const result = await pool.query(
+    "SELECT * FROM readings ORDER BY timestamp DESC LIMIT 1"
+  );
+  res.json(result.rows[0]);
 });
+
+// Fallback
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "public/index.html"));
+});
+
+const port = process.env.PORT || 3000;
+server.listen(port, () => console.log("Server running on port " + port));

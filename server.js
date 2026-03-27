@@ -31,6 +31,19 @@ pool.query(`
   )
 `);
 
+// Discord webhook sender
+async function sendDiscordAlert(message) {
+  try {
+    await fetch(process.env.DISCORD_WEBHOOK, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: message })
+    });
+  } catch (err) {
+    console.error("Discord webhook error:", err);
+  }
+}
+
 // WebSocket
 io.on("connection", () => {
   console.log("Dashboard connected");
@@ -44,6 +57,18 @@ app.post("/data", async (req, res) => {
     "INSERT INTO readings (temperature, humidity) VALUES ($1, $2)",
     [temperature, humidity]
   );
+
+  // Alert thresholds
+  const HIGH_TEMP = 30;
+  const LOW_HUM = 20;
+
+  if (temperature > HIGH_TEMP) {
+    sendDiscordAlert(`High Temperature Alert!\nTemperature: ${temperature}°C`);
+  }
+
+  if (humidity < LOW_HUM) {
+    sendDiscordAlert(`Low Humidity Alert!\nHumidity: ${humidity}%`);
+  }
 
   io.emit("newReading", { temperature, humidity, timestamp: new Date() });
 
